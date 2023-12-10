@@ -105,8 +105,10 @@ def send_to_lark(feeds):
         feeds (List[FeedEntry]): A list of feed entries that meet the specified criteria.
     """
     if not WEBHOOK_URL:
+        print("webhook not found")
         return
 
+    print(f"found {len(feeds)} post, start send to lark")
     for feed in feeds:
         card = gen_lark_msg_card(feed)
         resp = session.post(WEBHOOK_URL, json=card)
@@ -114,4 +116,6 @@ def send_to_lark(feeds):
 
 
 if __name__ == "__main__":
+    print("start run")
     send_to_lark(get_current_feeds())
+    print("send done")
