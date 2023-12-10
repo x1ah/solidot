@@ -21,8 +21,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install requests feedparser
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Run
+    - name: Run solidot.py
       env:
         WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
-      run: |
-        python solidot.py
+      run: python solidot.py
