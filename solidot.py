@@ -27,7 +27,9 @@ def get_current_feeds():
     for entry in feed.entries:
         published_date = datetime.strptime(entry.published, DATE_FORMAT)
         now = datetime.now(tz=published_date.tzinfo)
+        print(f"{entry.title} published at {published_date}, now {now}")
         if (now.timestamp() - published_date.timestamp()) > RUN_INTERVAL:
+            print("already send, skip")
             continue
 
         feeds.append(entry)
