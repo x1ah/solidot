@@ -11,7 +11,7 @@ from typing import Dict, Any
 RSS_URL = "https://www.solidot.org/index.rss"
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 DATE_FORMAT = "%a, %d %b %Y %H:%M:%S %z"
-RUN_INTERVAL = 10 * 60 # 10 分钟跑一次
+RUN_INTERVAL = 60 * 60 # 60 分钟跑一次
 session = requests.Session()
 
 
