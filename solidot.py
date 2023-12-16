@@ -11,30 +11,41 @@ from typing import Dict, Any
 RSS_URL = "https://www.solidot.org/index.rss"
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 DATE_FORMAT = "%a, %d %b %Y %H:%M:%S %z"
-RUN_INTERVAL = 60 * 60 # 60 分钟跑一次
+CACHE_PATH = ".cache"
+CACHE_FILE = "index.json"
+
 session = requests.Session()
+log = lambda message: print(f"[{datetime.now()}] {message}")
 
-
-def get_current_feeds():
+def load_cache_data():
     """
-    Retrieve the current feeds from the RSS_URL.
+    Load the cache data from the file.
 
     Returns:
-        List[FeedEntry]: A list of feed entries that meet the specified criteria.
+        Dict[str, Any]: The loaded cache data.
     """
-    feeds = []
-    feed = feedparser.parse(RSS_URL)
-    for entry in feed.entries:
-        published_date = datetime.strptime(entry.published, DATE_FORMAT)
-        now = datetime.now(tz=published_date.tzinfo)
-        print(f"{entry.title} published at {published_date}, now {now}")
-        if (now.timestamp() - published_date.timestamp()) > RUN_INTERVAL:
-            print("already send, skip")
-            continue
+    if not os.path.exists(f"{CACHE_PATH}/{CACHE_FILE}"):
+        return {}
+    
+    with open(f"{CACHE_PATH}/{CACHE_FILE}", "r") as f:
+        return json.load(f)
+    
 
-        feeds.append(entry)
+def refresh_cache_data(feeds):
+    """
+    Refresh the cache data with the provided feeds.
 
-    return feeds
+    Args:
+        feeds (List[FeedEntry]): The list of feed entries to be cached.
+
+    Returns:
+        None
+    """
+    if not os.path.exists(CACHE_PATH):
+        os.makedirs(CACHE_PATH)
+
+    with open(f"{CACHE_PATH}/{CACHE_FILE}", "w") as f:
+        json.dump(feeds, f)
 
 
 def gen_lark_msg_card(feed: Dict[str, Any]) -> Dict[str, Any]:
@@ -107,17 +118,55 @@ def send_to_lark(feeds):
         feeds (List[FeedEntry]): A list of feed entries that meet the specified criteria.
     """
     if not WEBHOOK_URL:
-        print("webhook not found")
+        log("webhook not found")
         return
 
-    print(f"found {len(feeds)} post, start send to lark")
+    log(f"found {len(feeds)} post, start send to lark")
     for feed in feeds:
         card = gen_lark_msg_card(feed)
         resp = session.post(WEBHOOK_URL, json=card)
-        print(f"send to lark: {feed.title}, resp: {resp.text}")
+        log(f"send to lark: {feed.title}, resp: {resp.text}")
+
+
+cached_feeds = load_cache_data()
+
+
+def filter_sent_feeds(feeds):
+    """
+    Filter the feeds that have already been sent.
+
+    Args:
+        feeds (List[FeedEntry]): A list of feed entries that meet the specified criteria.
+
+    Returns:
+        List[FeedEntry]: The filtered list of feed entries.
+    """
+    new_feeds = []
+    for feed in feeds:
+        if feed.link in cached_feeds:
+            continue
+        new_feeds.append(feed)
+
+    return new_feeds
+
+
+def gen_new_cache_data(feeds):
+    new_index = {feed.link: True for feed in feeds}
+    if len(cached_feeds) > 100:
+        return new_index
+    
+    return (new_index | cached_feeds)
 
 
 if __name__ == "__main__":
-    print("start run")
-    send_to_lark(get_current_feeds())
-    print("send done")
+    log("start run")
+    feed = feedparser.parse(RSS_URL)
+    fresh_feeds = filter_sent_feeds(feed.entries)
+    if not fresh_feeds:
+        log("no new post")
+        exit(0)
+
+    log(f"found {len(fresh_feeds)} new post, start send to lark")
+    send_to_lark(fresh_feeds)
+    refresh_cache_data(gen_new_cache_data(feed.entries))
+    log("send done")
